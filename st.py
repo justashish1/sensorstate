@@ -7,12 +7,15 @@ import logging
 import os
 import pytz
 import plotly.express as px
+import gdown
+import requests
+from io import BytesIO
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 # Set page layout to wide mode
-st.set_page_config(page_title="SENSORSTATE", layout="wide")
+st.set_page_config(page_title="Starengts Timeseries Analysis Application", layout="wide")
 
 # Initialize session state attributes for the main app
 if 'file_path' not in st.session_state:
@@ -74,7 +77,24 @@ load_session_state()
 def load_data(file_path):
     logging.info("Loading data from file: %s", file_path)
     try:
-        if file_path.endswith('.csv'):
+        if file_path.startswith('http://') or file_path.startswith('https://'):
+            if 'drive.google.com' in file_path:
+                # Handle Google Drive URL
+                file_id = file_path.split('/')[-2]
+                url = f"https://drive.google.com/uc?id={file_id}"
+                df = pd.read_csv(gdown.download(url, quiet=False))
+            else:
+                # Handle generic URL
+                response = requests.get(file_path)
+                content_type = response.headers['Content-Type']
+                if 'csv' in content_type:
+                    df = pd.read_csv(BytesIO(response.content))
+                elif 'excel' in content_type:
+                    df = pd.read_excel(BytesIO(response.content))
+                else:
+                    st.error("Unsupported file format")
+                    return None, None
+        elif file_path.endswith('.csv'):
             df = pd.read_csv(file_path)
         elif file_path.endswith('.xlsx') or file_path.endswith('.xls'):
             df = pd.read_excel(file_path)
@@ -123,7 +143,7 @@ def load_data_into_session(file_path):
             st.session_state.df = df
             st.session_state.all_columns = all_columns
             st.session_state.last_upload = time.time()
-            st.session_state.file_last_modified = os.path.getmtime(file_path)
+            st.session_state.file_last_modified = time.time()  # Assuming it's a new URL fetch
             logging.info("Data loaded into session state successfully")
             save_session_state()
         else:
@@ -141,7 +161,7 @@ def refresh_data():
         if df is not None and all_columns is not None:
             st.session_state.df = df
             st.session_state.all_columns = all_columns
-            st.session_state.file_last_modified = os.path.getmtime(file_path)
+            st.session_state.file_last_modified = time.time()  # Assuming it's a new URL fetch
             logging.info("Data refreshed successfully")
             save_session_state()
         else:
@@ -190,46 +210,46 @@ def custom_css():
                 display: flex;
                 justify-content: space-between;
                 color: #32c800;
-                align-items: center;
+                align-items: center.
             }
             .developer-info {
-                font-size: 12px;
-                text-align: left;
-                position: fixed;
-                bottom: 10px;
-                left: 150px;
-                color: white;
+                font-size: 12px.
+                text-align: left.
+                position: fixed.
+                bottom: 10px.
+                left: 150px.
+                color: white.
             }
             .stButton > button {
-                background-color: #32c800;
-                color: white;
-                border: none;
-                font-weight: bold;
+                background-color: #32c800.
+                color: white.
+                border: none.
+                font-weight: bold.
             }
             .stButton > button:hover {
-                color: white;
-                background-color: #32c800;
+                color: white.
+                background-color: #32c800.
             }
             .custom-error {
-                background-color: #32c800;
-                color: white;
-                padding: 10px;
-                border-radius: 5px;
-                text-align: center;
-                font-weight: bold;
+                background-color: #32c800.
+                color: white.
+                padding: 10px.
+                border-radius: 5px.
+                text-align: center.
+                font-weight: bold.
             }
             .download-manual {
-                font-size: 12px;
-                font-weight: bold;
-                position: fixed;
-                bottom: 10px;
-                left: 25px;
-                background-color: #32c800;
-                color: white !important;
-                padding: 4px 8px; /* Adjusted padding to reduce the button size */
-                border-radius: 5px;
-                text-align: center;
-                text-decoration: none;
+                font-size: 12px.
+                font-weight: bold.
+                position: fixed.
+                bottom: 10px.
+                left: 25px.
+                background-color: #32c800.
+                color: white !important.
+                padding: 4px 8px. /* Adjusted padding to reduce the button size */
+                border-radius: 5px.
+                text-align: center.
+                text-decoration: none.
             }
         </style>
     """, unsafe_allow_html=True)
@@ -331,11 +351,11 @@ def main():
     if st.session_state.get("authenticated"):
 
         # Display the main app content
-        st.title('SENSORSTATE')
+        st.title('STARENGTS LIVE TIME SERIES DATA MONITORING')
         st.sidebar.header('Filters')
 
-        # Allow user to specify the file path
-        file_path_input = st.sidebar.text_input("File path")
+        # Allow user to specify the file path or URL
+        file_path_input = st.sidebar.text_input("File path or URL")
 
         # File upload option
         uploaded_file = st.sidebar.file_uploader("Or upload a CSV or Excel file", type=["csv", "xlsx", "xls"])
@@ -348,7 +368,7 @@ def main():
             st.session_state.file_path = file_path
             load_data_into_session(st.session_state.file_path)
         elif file_path_input:
-            # Use the specified file path
+            # Use the specified file path or URL
             st.session_state.file_path = file_path_input
             load_data_into_session(st.session_state.file_path)
 
@@ -535,7 +555,7 @@ def main():
                         time.sleep(st.session_state.refresh_interval)
                         periodic_save()
                         if st.session_state.file_path:
-                            current_mod_time = os.path.getmtime(st.session_state.file_path)
+                            current_mod_time = time.time()  # Assuming it's a new URL fetch
                             if st.session_state.file_last_modified != current_mod_time:
                                 refresh_data()
                             st.experimental_rerun()
