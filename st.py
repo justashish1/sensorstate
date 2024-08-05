@@ -10,12 +10,14 @@ import plotly.express as px
 import gdown
 import requests
 from io import BytesIO
+from office365.runtime.auth.client_credential import ClientCredential
+from office365.sharepoint.client_context import ClientContext
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 # Set page layout to wide mode
-st.set_page_config(page_title="Starengts Timeseries Analysis Application", layout="wide")
+st.set_page_config(page_title="SENSORSTATE", layout="wide")
 
 # Initialize session state attributes for the main app
 if 'file_path' not in st.session_state:
@@ -83,6 +85,22 @@ def load_data(file_path):
                 file_id = file_path.split('/')[-2]
                 url = f"https://drive.google.com/uc?id={file_id}"
                 df = pd.read_csv(gdown.download(url, quiet=False))
+            elif 'sharepoint.com' in file_path:
+                # Handle SharePoint URL
+                sharepoint_url = 'https://henkelgroup.sharepoint.com'
+                client_id = 'YOUR_CLIENT_ID'
+                client_secret = 'YOUR_CLIENT_SECRET'
+                credentials = ClientCredential(client_id, client_secret)
+                ctx = ClientContext(sharepoint_url).with_credentials(credentials)
+                response = ctx.web.get_file_by_server_relative_url(file_path).execute_query()
+                content = response.content
+                if file_path.endswith('.csv'):
+                    df = pd.read_csv(BytesIO(content))
+                elif file_path.endswith('.xlsx') or file_path.endswith('.xls'):
+                    df = pd.read_excel(BytesIO(content))
+                else:
+                    st.error("Unsupported file format")
+                    return None, None
             else:
                 # Handle generic URL
                 response = requests.get(file_path)
