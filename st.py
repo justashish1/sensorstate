@@ -7,10 +7,9 @@ import logging
 import os
 import pytz
 import plotly.express as px
-import gdown
 import requests
 from io import BytesIO
-from office365.runtime.auth.client_credential import ClientCredential
+from office365.runtime.auth.user_credential import UserCredential
 from office365.sharepoint.client_context import ClientContext
 
 # Configure logging
@@ -76,38 +75,33 @@ load_session_state()
 
 # Function to load data and detect columns
 @st.cache_data
-def load_data(file_path):
+def load_data(file_path, username=None, password=None):
     logging.info("Loading data from file: %s", file_path)
     try:
         if file_path.startswith('http://') or file_path.startswith('https://'):
-            if 'drive.google.com' in file_path:
-                # Handle Google Drive URL
-                file_id = file_path.split('/')[-2]
-                url = f"https://drive.google.com/uc?id={file_id}"
-                df = pd.read_csv(gdown.download(url, quiet=False))
-            elif 'sharepoint.com' in file_path:
-                # Handle SharePoint URL
-                sharepoint_url = 'https://henkelgroup.sharepoint.com'
-                client_id = 'YOUR_CLIENT_ID'
-                client_secret = 'YOUR_CLIENT_SECRET'
-                credentials = ClientCredential(client_id, client_secret)
-                ctx = ClientContext(sharepoint_url).with_credentials(credentials)
+            if 'sharepoint.com' in file_path and username and password:
+                ctx = ClientContext(file_path).with_credentials(UserCredential(username, password))
                 response = ctx.web.get_file_by_server_relative_url(file_path).execute_query()
-                content = response.content
+                bytes_file_obj = BytesIO()
+                bytes_file_obj.write(response.content)
+                bytes_file_obj.seek(0)
                 if file_path.endswith('.csv'):
-                    df = pd.read_csv(BytesIO(content))
+                    df = pd.read_csv(bytes_file_obj)
                 elif file_path.endswith('.xlsx') or file_path.endswith('.xls'):
-                    df = pd.read_excel(BytesIO(content))
+                    df = pd.read_excel(bytes_file_obj)
                 else:
                     st.error("Unsupported file format")
                     return None, None
             else:
-                # Handle generic URL
                 response = requests.get(file_path)
-                content_type = response.headers['Content-Type']
+                if response.status_code != 200:
+                    st.error("Failed to load data from the URL")
+                    return None, None
+
+                content_type = response.headers.get('Content-Type')
                 if 'csv' in content_type:
                     df = pd.read_csv(BytesIO(response.content))
-                elif 'excel' in content_type:
+                elif 'excel' in content_type or file_path.endswith('.xlsx') or file_path.endswith('.xls'):
                     df = pd.read_excel(BytesIO(response.content))
                 else:
                     st.error("Unsupported file format")
@@ -150,13 +144,13 @@ def filter_data(df, timestamp_col, start_datetime, end_datetime, freq):
         return pd.DataFrame()
 
 # Function to load data into session state
-def load_data_into_session(file_path):
+def load_data_into_session(file_path, username=None, password=None):
     logging.info("Loading data into session state from path: %s", file_path)
     if file_path:
         # Clear cache before loading new data
         st.cache_data.clear()
         
-        df, all_columns = load_data(file_path)
+        df, all_columns = load_data(file_path, username, password)
         if df is not None and all_columns is not None:
             st.session_state.df = df
             st.session_state.all_columns = all_columns
@@ -228,46 +222,46 @@ def custom_css():
                 display: flex;
                 justify-content: space-between;
                 color: #32c800;
-                align-items: center.
+                align-items: center;
             }
             .developer-info {
-                font-size: 12px.
-                text-align: left.
-                position: fixed.
-                bottom: 10px.
-                left: 150px.
-                color: white.
+                font-size: 12px;
+                text-align: left;
+                position: fixed;
+                bottom: 10px;
+                left: 150px;
+                color: white;
             }
             .stButton > button {
-                background-color: #32c800.
-                color: white.
-                border: none.
-                font-weight: bold.
+                background-color: #32c800;
+                color: white;
+                border: none;
+                font-weight: bold;
             }
             .stButton > button:hover {
-                color: white.
-                background-color: #32c800.
+                color: white;
+                background-color: #32c800;
             }
             .custom-error {
-                background-color: #32c800.
-                color: white.
-                padding: 10px.
-                border-radius: 5px.
-                text-align: center.
-                font-weight: bold.
+                background-color: #32c800;
+                color: white;
+                padding: 10px;
+                border-radius: 5px;
+                text-align: center;
+                font-weight: bold;
             }
             .download-manual {
-                font-size: 12px.
-                font-weight: bold.
-                position: fixed.
-                bottom: 10px.
-                left: 25px.
-                background-color: #32c800.
-                color: white !important.
-                padding: 4px 8px. /* Adjusted padding to reduce the button size */
-                border-radius: 5px.
-                text-align: center.
-                text-decoration: none.
+                font-size: 12px;
+                font-weight: bold;
+                position: fixed;
+                bottom: 10px;
+                left: 25px;
+                background-color: #32c800;
+                color: white !important;
+                padding: 4px 8px; /* Adjusted padding to reduce the button size */
+                border-radius: 5px;
+                text-align: center;
+                text-decoration: none;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -374,6 +368,8 @@ def main():
 
         # Allow user to specify the file path or URL
         file_path_input = st.sidebar.text_input("File path or URL")
+        username = st.sidebar.text_input("Username (if required for SharePoint)")
+        password = st.sidebar.text_input("Password (if required for SharePoint)", type="password")
 
         # File upload option
         uploaded_file = st.sidebar.file_uploader("Or upload a CSV or Excel file", type=["csv", "xlsx", "xls"])
@@ -388,7 +384,7 @@ def main():
         elif file_path_input:
             # Use the specified file path or URL
             st.session_state.file_path = file_path_input
-            load_data_into_session(st.session_state.file_path)
+            load_data_into_session(st.session_state.file_path, username, password)
 
         if st.session_state.df is not None and st.session_state.file_path is not None:
             df = st.session_state.df
