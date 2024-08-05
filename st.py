@@ -136,10 +136,6 @@ def filter_data(df, timestamp_col, start_datetime, end_datetime, freq):
     logging.info("Filtering data from %s to %s with frequency %s", start_datetime, end_datetime, freq)
     try:
         df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
-        
-        # Do not drop rows with missing values in the timestamp column, but log a warning
-        if df[timestamp_col].isnull().any():
-            logging.warning("Some rows have missing timestamp values")
 
         mask = (df[timestamp_col] >= start_datetime) & (df[timestamp_col] <= end_datetime)
         df = df.loc[mask]
@@ -259,20 +255,20 @@ def custom_css():
                 padding: 10px;
                 border-radius: 5px;
                 text-align: center;
-                font-weight: bold.
+                font-weight: bold;
             }
             .download-manual {
                 font-size: 12px;
-                font-weight: bold.
-                position: fixed.
-                bottom: 10px.
-                left: 25px.
-                background-color: #32c800.
-                color: white !important.
-                padding: 4px 8px. /* Adjusted padding to reduce the button size */
-                border-radius: 5px.
-                text-align: center.
-                text-decoration: none.
+                font-weight: bold;
+                position: fixed;
+                bottom: 10px;
+                left: 25px;
+                background-color: #32c800;
+                color: white !important;
+                padding: 4px 8px; /* Adjusted padding to reduce the button size */
+                border-radius: 5px;
+                text-align: center;
+                text-decoration: none;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -423,7 +419,6 @@ def main():
                 plot_name = st.sidebar.text_input("Plot Name")
                 if st.sidebar.button('Add Plot'):
                     st.session_state.plots.append((timestamp_col, value_cols, plot_name, min_datetime, max_datetime, 'Line', 'None'))
-                    save_session_state()
 
                 # Select plot to apply filters
                 plot_names = ["All"] + [plot[2] for plot in st.session_state.plots]
@@ -463,13 +458,9 @@ def main():
                 if st.sidebar.button('Start Auto-Refresh', key="start_auto_refresh"):
                     st.session_state.auto_refresh = True
                     st.session_state.refresh_interval = refresh_interval
-                    save_session_state()
-                    st.experimental_rerun()
 
                 if st.sidebar.button('Stop Auto-Refresh', key="stop_auto_refresh"):
                     st.session_state.auto_refresh = False
-                    save_session_state()
-                    st.experimental_rerun()
 
                 # Display the current auto-refresh status
                 if st.session_state.auto_refresh:
@@ -498,7 +489,6 @@ def main():
                         freq = st.selectbox(f'Frequency for {plot_name}', ['None', 'Minute', 'Hour', 'Daily', 'Weekly', 'Monthly', 'Yearly'], index=['None', 'Minute', 'Hour', 'Daily', 'Weekly', 'Monthly', 'Yearly'].index(plot_freq), key=f'freq_{i}')
                         freq_dict = {'None': None, 'Minute': 'T', 'Hour': 'H', 'Daily': 'D', 'Weekly': 'W', 'Monthly': 'M', 'Yearly': 'Y'}
                         plot_freq = freq_dict[freq]
-                        st.session_state.plots[i] = (timestamp_col, value_cols, plot_name, plot_min_datetime, plot_max_datetime, plot_type, freq)
 
                         filtered_df = filter_data(df, timestamp_col, start_datetime, end_datetime, plot_freq)
                         if not filtered_df.empty:
@@ -539,7 +529,6 @@ def main():
 
                 for i in reversed(plot_indices_to_remove):
                     del st.session_state.plots[i]
-                    save_session_state()
 
                 # Data Entry for Adding New Data
                 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
@@ -557,6 +546,7 @@ def main():
                         new_data = pd.DataFrame({timestamp_col: [new_datetime], new_value_col: [new_value]})
                         st.session_state.df = pd.concat([st.session_state.df, new_data], ignore_index=True)
                         st.session_state.df[timestamp_col] = pd.to_datetime(st.session_state.df[timestamp_col], errors='coerce')
+                        st.session_state.df = st.session_state.df.dropna(subset=[timestamp_col])
                         st.session_state.df = st.session_state.df.sort_values(by=timestamp_col).reset_index(drop=True)
 
                         # Save updated data back to the file
@@ -566,7 +556,6 @@ def main():
                             st.session_state.df.to_excel(st.session_state.file_path, index=False)
 
                         st.write("Data added successfully")
-                        save_session_state()
                         st.experimental_rerun()
                     except Exception as e:
                         st.error(f"Error adding data: {e}")
