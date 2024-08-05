@@ -4,14 +4,12 @@ import base64
 import numpy as np
 import time
 from datetime import datetime
-from prophet import Prophet
 import plotly.graph_objects as go
 import plotly.express as px
 import seaborn as sns
 import logging
 import io
 import os
-import pytz
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
