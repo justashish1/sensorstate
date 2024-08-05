@@ -4,17 +4,11 @@ import base64
 import numpy as np
 import time
 from datetime import datetime
-from sklearn.linear_model import LinearRegression
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-from statsmodels.tsa.seasonal import seasonal_decompose
-from sklearn.ensemble import IsolationForest
 from prophet import Prophet
 import plotly.graph_objects as go
 import plotly.express as px
 import seaborn as sns
 import logging
-from st_aggrid import AgGrid, GridOptionsBuilder
 import io
 import os
 import pytz
