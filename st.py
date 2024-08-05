@@ -80,7 +80,6 @@ def load_data(file_path, username=None, password=None):
     try:
         if file_path.startswith('http://') or file_path.startswith('https://'):
             if 'sharepoint.com' in file_path and username and password:
-                # Adjust the URL to get the file
                 site_url = "https://{your-tenant-name}.sharepoint.com"
                 ctx = ClientContext(site_url).with_credentials(UserCredential(username, password))
                 web = ctx.web
