@@ -216,7 +216,7 @@ def custom_css():
                 margin-right: 20px;
             }
             .logo {
-                height: 45px;
+                height: 65px;
                 width: auto;  /* Ensures the aspect ratio is maintained */
                 display: inline-block;
                 margin-left: auto;
