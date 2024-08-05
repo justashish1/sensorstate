@@ -332,7 +332,7 @@ def download_manual():
         href = f'<a href="data:application/pdf;base64,{b64}" download="{file_name}" class="download-manual">Download Manual</a>'
         st.markdown(href, unsafe_allow_html=True)
     else:
-        st.warning("Manual not available. Send request to Ashish Malviya!")
+        st.warning("Manual not available. Send request to Ashish Malviya - info@starengts.com!")
 
 # Main function for the login page
 def login_page():
