@@ -80,6 +80,7 @@ def load_data(file_path, username=None, password=None):
     try:
         if file_path.startswith('http://') or file_path.startswith('https://'):
             if 'sharepoint.com' in file_path and username and password:
+                # Adjust the URL to get the file
                 site_url = "https://{your-tenant-name}.sharepoint.com"
                 ctx = ClientContext(site_url).with_credentials(UserCredential(username, password))
                 web = ctx.web
@@ -135,7 +136,10 @@ def filter_data(df, timestamp_col, start_datetime, end_datetime, freq):
     logging.info("Filtering data from %s to %s with frequency %s", start_datetime, end_datetime, freq)
     try:
         df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
-        df = df.dropna(subset=[timestamp_col])
+        
+        # Do not drop rows with missing values in the timestamp column, but log a warning
+        if df[timestamp_col].isnull().any():
+            logging.warning("Some rows have missing timestamp values")
 
         mask = (df[timestamp_col] >= start_datetime) & (df[timestamp_col] <= end_datetime)
         df = df.loc[mask]
@@ -255,20 +259,20 @@ def custom_css():
                 padding: 10px;
                 border-radius: 5px;
                 text-align: center;
-                font-weight: bold;
+                font-weight: bold.
             }
             .download-manual {
                 font-size: 12px;
-                font-weight: bold;
-                position: fixed;
-                bottom: 10px;
-                left: 25px;
-                background-color: #32c800;
-                color: white !important;
-                padding: 4px 8px; /* Adjusted padding to reduce the button size */
-                border-radius: 5px;
-                text-align: center;
-                text-decoration: none;
+                font-weight: bold.
+                position: fixed.
+                bottom: 10px.
+                left: 25px.
+                background-color: #32c800.
+                color: white !important.
+                padding: 4px 8px. /* Adjusted padding to reduce the button size */
+                border-radius: 5px.
+                text-align: center.
+                text-decoration: none.
             }
         </style>
     """, unsafe_allow_html=True)
@@ -404,7 +408,6 @@ def main():
             if len(value_cols) > 0:
                 # Convert datetime column to pandas datetime
                 df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
-                df = df.dropna(subset=[timestamp_col])
 
                 # Detect minimum and maximum datetime values
                 min_datetime = df[timestamp_col].min()
@@ -554,7 +557,6 @@ def main():
                         new_data = pd.DataFrame({timestamp_col: [new_datetime], new_value_col: [new_value]})
                         st.session_state.df = pd.concat([st.session_state.df, new_data], ignore_index=True)
                         st.session_state.df[timestamp_col] = pd.to_datetime(st.session_state.df[timestamp_col], errors='coerce')
-                        st.session_state.df = st.session_state.df.dropna(subset=[timestamp_col])
                         st.session_state.df = st.session_state.df.sort_values(by=timestamp_col).reset_index(drop=True)
 
                         # Save updated data back to the file
