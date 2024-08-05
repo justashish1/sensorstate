@@ -331,7 +331,7 @@ def main():
     if st.session_state.get("authenticated"):
 
         # Display the main app content
-        st.title('STARENGTS LIVE TIME SERIES DATA MONITORING')
+        st.title('SENSORSTATE')
         st.sidebar.header('Filters')
 
         # Allow user to specify the file path
