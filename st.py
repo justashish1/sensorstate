@@ -7,11 +7,12 @@ import logging
 import os
 import pytz
 import plotly.express as px
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 # Set page layout to wide mode
-st.set_page_config(page_title="Starengts Timeseries Analysis Application", layout="wide")
+st.set_page_config(page_title="SENSORSTATE", layout="wide")
 
 # Initialize session state attributes for the main app
 if 'file_path' not in st.session_state:
@@ -541,6 +542,17 @@ def main():
 
         else:
             st.write("Please upload a CSV or Excel file to display the data.")
+
+        # Logout button at the bottom of the sidebar
+        st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+        if st.sidebar.button("Logout"):
+            st.session_state.authenticated = False
+            save_session_state()
+            st.markdown("""
+                <script>
+                window.location.href = window.location.href.split('?')[0];
+                </script>
+            """, unsafe_allow_html=True)
 
     else:
         login_page()
