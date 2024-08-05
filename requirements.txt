@@ -13,3 +13,4 @@ langchain
 chart-studio
 gdown
 requests
+Office365-REST-Python-Client
