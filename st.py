@@ -80,15 +80,23 @@ def load_data(file_path, username=None, password=None):
     try:
         if file_path.startswith('http://') or file_path.startswith('https://'):
             if 'sharepoint.com' in file_path and username and password:
-                ctx = ClientContext(file_path).with_credentials(UserCredential(username, password))
-                response = ctx.web.get_file_by_server_relative_url(file_path).execute_query()
-                bytes_file_obj = BytesIO()
-                bytes_file_obj.write(response.content)
-                bytes_file_obj.seek(0)
-                if file_path.endswith('.csv'):
-                    df = pd.read_csv(bytes_file_obj)
-                elif file_path.endswith('.xlsx') or file_path.endswith('.xls'):
-                    df = pd.read_excel(bytes_file_obj)
+                # Adjust the URL to get the file
+                site_url = "https://{your-tenant-name}.sharepoint.com"
+                ctx = ClientContext(site_url).with_credentials(UserCredential(username, password))
+                web = ctx.web
+                ctx.load(web)
+                ctx.execute_query()
+                
+                response = requests.get(file_path, auth=(username, password))
+                if response.status_code != 200:
+                    st.error("Failed to load data from the URL")
+                    return None, None
+
+                content_type = response.headers.get('Content-Type')
+                if 'csv' in content_type:
+                    df = pd.read_csv(BytesIO(response.content))
+                elif 'excel' in content_type or file_path.endswith('.xlsx') or file_path.endswith('.xls'):
+                    df = pd.read_excel(BytesIO(response.content))
                 else:
                     st.error("Unsupported file format")
                     return None, None
