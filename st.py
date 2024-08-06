@@ -135,11 +135,10 @@ def load_data(file_path, username=None, password=None):
 def filter_data(df, timestamp_col, start_datetime, end_datetime):
     logging.info("Filtering data from %s to %s", start_datetime, end_datetime)
     try:
-        if timestamp_col != "None":
-            df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
-            df = df.dropna(subset=[timestamp_col])
-            mask = (df[timestamp_col] >= start_datetime) & (df[timestamp_col] <= end_datetime)
-            df = df.loc[mask]
+        df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
+
+        mask = (df[timestamp_col] >= start_datetime) & (df[timestamp_col] <= end_datetime)
+        df = df.loc[mask]
 
         logging.info("Data filtered successfully with %d records", len(df))
         return df
@@ -400,8 +399,8 @@ def main():
             value_cols = st.sidebar.multiselect("Select the value column(s)", all_columns)
 
             if len(value_cols) > 0:
+                # Convert datetime column to pandas datetime if it's not "None"
                 if timestamp_col != "None":
-                    # Convert datetime column to pandas datetime
                     df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
 
                     # Detect minimum and maximum datetime values
@@ -436,11 +435,8 @@ def main():
 
                     start_datetime = datetime.combine(start_date, start_time)
                     end_datetime = datetime.combine(end_date, end_time)
-
-                    st.sidebar.markdown("<hr>", unsafe_allow_html=True)
                 else:
-                    start_datetime = None
-                    end_datetime = None
+                    start_datetime, end_datetime = None, None
 
                 # Add plot button and name input
                 plot_name = st.sidebar.text_input("Plot Name")
@@ -485,10 +481,9 @@ def main():
                     timestamp_col, value_cols, plot_name, plot_type = plot_config
 
                     if selected_plot == "All" or selected_plot == plot_name:
+                        filtered_df = df.copy()
                         if timestamp_col != "None":
                             filtered_df = filter_data(df, timestamp_col, start_datetime, end_datetime)
-                        else:
-                            filtered_df = df
 
                         if not filtered_df.empty:
                             st.subheader(f"Plot: {plot_name}")
@@ -498,19 +493,19 @@ def main():
                             color_discrete_sequence = primary_colors + px.colors.qualitative.Plotly[len(primary_colors):]
 
                             if plot_type == 'Line':
-                                fig = px.line(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Sensor Data Over Time - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.line(filtered_df, x=timestamp_col, y=value_cols, title=f'Sensor Data Over Time - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Pie':
-                                fig = px.pie(filtered_df, names=timestamp_col if timestamp_col != "None" else value_cols[0], values=value_cols[0], title=f'Sensor Data Pie Chart - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.pie(filtered_df, names=timestamp_col, values=value_cols[0], title=f'Sensor Data Pie Chart - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Box':
-                                fig = px.box(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Sensor Data Box Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.box(filtered_df, x=timestamp_col, y=value_cols, title=f'Sensor Data Box Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Bar':
-                                fig = px.bar(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Sensor Data Bar Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.bar(filtered_df, x=timestamp_col, y=value_cols, title=f'Sensor Data Bar Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Stacked Bar':
-                                fig = px.bar(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Sensor Data Stacked Bar Plot - {plot_name}', barmode='stack', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.bar(filtered_df, x=timestamp_col, y=value_cols, title=f'Sensor Data Stacked Bar Plot - {plot_name}', barmode='stack', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Count':
-                                fig = px.histogram(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Count Plot - {plot_name}', histfunc='count', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.histogram(filtered_df, x=timestamp_col, y=value_cols, title=f'Count Plot - {plot_name}', histfunc='count', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Scatter':
-                                fig = px.scatter(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Scatter Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.scatter(filtered_df, x=timestamp_col, y=value_cols, title=f'Scatter Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Correlation':
                                 corr = filtered_df[value_cols].corr()
                                 fig = px.imshow(corr, text_auto=True, title=f'Correlation Plot - {plot_name}')
@@ -529,7 +524,7 @@ def main():
                 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
                 
                 st.sidebar.header("Add New Data")
-                new_date = st.sidebar.date_input("Date", value=datetime.today().date())
+                new_date = st.sidebar.date_input("Date", value=max_datetime.date() if timestamp_col != "None" else datetime.now().date())
                 new_time_str = st.sidebar.selectbox("Time", time_options)
                 new_value = st.sidebar.number_input("Value", value=0)
                 new_value_col = st.sidebar.selectbox("Select the value column to add data to", value_cols)
@@ -538,7 +533,7 @@ def main():
                     try:
                         new_time = datetime.strptime(new_time_str, '%H:%M').time()
                         new_datetime = datetime.combine(new_date, new_time) if timestamp_col != "None" else None
-                        new_data = pd.DataFrame({timestamp_col: [new_datetime] if timestamp_col != "None" else [new_value], new_value_col: [new_value]})
+                        new_data = pd.DataFrame({timestamp_col: [new_datetime], new_value_col: [new_value]}) if timestamp_col != "None" else pd.DataFrame({new_value_col: [new_value]})
                         st.session_state.df = pd.concat([st.session_state.df, new_data], ignore_index=True)
                         if timestamp_col != "None":
                             st.session_state.df[timestamp_col] = pd.to_datetime(st.session_state.df[timestamp_col], errors='coerce')
