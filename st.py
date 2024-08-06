@@ -132,16 +132,14 @@ def load_data(file_path, username=None, password=None):
         return None, None
 
 # Function to apply filters
-def filter_data(df, timestamp_col, start_datetime, end_datetime, freq):
-    logging.info("Filtering data from %s to %s with frequency %s", start_datetime, end_datetime, freq)
+def filter_data(df, timestamp_col, start_datetime, end_datetime):
+    logging.info("Filtering data from %s to %s", start_datetime, end_datetime)
     try:
-        df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
-
-        mask = (df[timestamp_col] >= start_datetime) & (df[timestamp_col] <= end_datetime)
-        df = df.loc[mask]
-
-        if freq:
-            df = df.set_index(timestamp_col).resample(freq).mean().reset_index()
+        if timestamp_col != "None":
+            df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
+            df = df.dropna(subset=[timestamp_col])
+            mask = (df[timestamp_col] >= start_datetime) & (df[timestamp_col] <= end_datetime)
+            df = df.loc[mask]
 
         logging.info("Data filtered successfully with %d records", len(df))
         return df
@@ -398,56 +396,60 @@ def main():
             all_columns = st.session_state.all_columns
 
             # User specifies the timestamp and value columns
-            timestamp_col = st.sidebar.selectbox("Select the timestamp column", all_columns)
+            timestamp_col = st.sidebar.selectbox("Select the timestamp column", ["None"] + all_columns)
             value_cols = st.sidebar.multiselect("Select the value column(s)", all_columns)
 
             if len(value_cols) > 0:
-                # Convert datetime column to pandas datetime
-                df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
+                if timestamp_col != "None":
+                    # Convert datetime column to pandas datetime
+                    df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
 
-                # Detect minimum and maximum datetime values
-                min_datetime = df[timestamp_col].min()
-                max_datetime = df[timestamp_col].max()
+                    # Detect minimum and maximum datetime values
+                    min_datetime = df[timestamp_col].min()
+                    max_datetime = df[timestamp_col].max()
 
-                # Display detected format
-                st.sidebar.write(f"Detected start datetime: {min_datetime}")
-                st.sidebar.write(f"Detected end datetime: {max_datetime}")
+                    # Display detected format
+                    st.sidebar.write(f"Detected start datetime: {min_datetime}")
+                    st.sidebar.write(f"Detected end datetime: {max_datetime}")
 
-                st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+                    st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+
+                    # Date input for start datetime
+                    start_date = st.sidebar.date_input('Start date', value=min_datetime.date(), min_value=min_datetime.date(), max_value=max_datetime.date())
+
+                    # Generate time options
+                    time_options = [f"{hour:02}:{minute:02}" for hour in range(24) for minute in range(60)]
+
+                    # Time input for start datetime
+                    start_time_str = st.sidebar.selectbox('Start time', time_options, index=time_options.index(min_datetime.strftime('%H:%M')))
+                    end_date = st.sidebar.date_input('End date', value=max_datetime.date(), min_value=min_datetime.date(), max_value=max_datetime.date())
+                    end_time_str = st.sidebar.selectbox('End time', time_options, index=time_options.index(max_datetime.strftime('%H:%M')))
+
+                    # Combine date and time
+                    try:
+                        start_time = datetime.strptime(start_time_str, '%H:%M').time()
+                        end_time = datetime.strptime(end_time_str, '%H:%M').time()
+                    except ValueError:
+                        st.error("Invalid time format. Please use HH:MM.")
+                        start_time = min_datetime.time()
+                        end_time = max_datetime.time()
+
+                    start_datetime = datetime.combine(start_date, start_time)
+                    end_datetime = datetime.combine(end_date, end_time)
+
+                    st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+                else:
+                    start_datetime = None
+                    end_datetime = None
 
                 # Add plot button and name input
                 plot_name = st.sidebar.text_input("Plot Name")
                 if st.sidebar.button('Add Plot'):
-                    st.session_state.plots.append((timestamp_col, value_cols, plot_name, min_datetime, max_datetime, 'Line', 'None'))
+                    st.session_state.plots.append((timestamp_col, value_cols, plot_name, 'Line'))
 
                 # Select plot to apply filters
                 plot_names = ["All"] + [plot[2] for plot in st.session_state.plots]
                 selected_plot = st.sidebar.selectbox("Select Plot", plot_names)
-
-                st.sidebar.markdown("<hr>", unsafe_allow_html=True)
-
-                # Date input for start datetime
-                start_date = st.sidebar.date_input('Start date', value=min_datetime.date(), min_value=min_datetime.date(), max_value=max_datetime.date())
-
-                # Generate time options
-                time_options = [f"{hour:02}:{minute:02}" for hour in range(24) for minute in range(60)]
-
-                # Time input for start datetime
-                start_time_str = st.sidebar.selectbox('Start time', time_options, index=time_options.index(min_datetime.strftime('%H:%M')))
-                end_date = st.sidebar.date_input('End date', value=max_datetime.date(), min_value=min_datetime.date(), max_value=max_datetime.date())
-                end_time_str = st.sidebar.selectbox('End time', time_options, index=time_options.index(max_datetime.strftime('%H:%M')))
-
-                # Combine date and time
-                try:
-                    start_time = datetime.strptime(start_time_str, '%H:%M').time()
-                    end_time = datetime.strptime(end_time_str, '%H:%M').time()
-                except ValueError:
-                    st.error("Invalid time format. Please use HH:MM.")
-                    start_time = min_datetime.time()
-                    end_time = max_datetime.time()
-
-                start_datetime = datetime.combine(start_date, start_time)
-                end_datetime = datetime.combine(end_date, end_time)
 
                 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 
@@ -480,17 +482,14 @@ def main():
                 # Display data with Plotly for each plot configuration
                 plot_indices_to_remove = []
                 for i, plot_config in enumerate(st.session_state.plots):
-                    timestamp_col, value_cols, plot_name, plot_min_datetime, plot_max_datetime, plot_type, plot_freq = plot_config
+                    timestamp_col, value_cols, plot_name, plot_type = plot_config
 
                     if selected_plot == "All" or selected_plot == plot_name:
-                        if plot_freq not in ['None', 'Minute', 'Hour', 'Daily', 'Weekly', 'Monthly', 'Yearly']:
-                            plot_freq = 'None'
+                        if timestamp_col != "None":
+                            filtered_df = filter_data(df, timestamp_col, start_datetime, end_datetime)
+                        else:
+                            filtered_df = df
 
-                        freq = st.selectbox(f'Frequency for {plot_name}', ['None', 'Minute', 'Hour', 'Daily', 'Weekly', 'Monthly', 'Yearly'], index=['None', 'Minute', 'Hour', 'Daily', 'Weekly', 'Monthly', 'Yearly'].index(plot_freq), key=f'freq_{i}')
-                        freq_dict = {'None': None, 'Minute': 'T', 'Hour': 'H', 'Daily': 'D', 'Weekly': 'W', 'Monthly': 'M', 'Yearly': 'Y'}
-                        plot_freq = freq_dict[freq]
-
-                        filtered_df = filter_data(df, timestamp_col, start_datetime, end_datetime, plot_freq)
                         if not filtered_df.empty:
                             st.subheader(f"Plot: {plot_name}")
                             plot_type = st.selectbox(f'Select plot type for {plot_name}', ['Line', 'Pie', 'Box', 'Bar', 'Stacked Bar', 'Count', 'Scatter', 'Correlation'], index=['Line', 'Pie', 'Box', 'Bar', 'Stacked Bar', 'Count', 'Scatter', 'Correlation'].index(plot_type), key=f'plot_type_{i}')
@@ -499,26 +498,22 @@ def main():
                             color_discrete_sequence = primary_colors + px.colors.qualitative.Plotly[len(primary_colors):]
 
                             if plot_type == 'Line':
-                                fig = px.line(filtered_df, x=timestamp_col, y=value_cols, title=f'Sensor Data Over Time - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.line(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Sensor Data Over Time - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Pie':
-                                fig = px.pie(filtered_df, names=timestamp_col, values=value_cols[0], title=f'Sensor Data Pie Chart - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.pie(filtered_df, names=timestamp_col if timestamp_col != "None" else value_cols[0], values=value_cols[0], title=f'Sensor Data Pie Chart - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Box':
-                                fig = px.box(filtered_df, x=timestamp_col, y=value_cols, title=f'Sensor Data Box Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.box(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Sensor Data Box Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Bar':
-                                fig = px.bar(filtered_df, x=timestamp_col, y=value_cols, title=f'Sensor Data Bar Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.bar(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Sensor Data Bar Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Stacked Bar':
-                                fig = px.bar(filtered_df, x=timestamp_col, y=value_cols, title=f'Sensor Data Stacked Bar Plot - {plot_name}', barmode='stack', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.bar(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Sensor Data Stacked Bar Plot - {plot_name}', barmode='stack', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Count':
-                                fig = px.histogram(filtered_df, x=timestamp_col, y=value_cols, title=f'Count Plot - {plot_name}', histfunc='count', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.histogram(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Count Plot - {plot_name}', histfunc='count', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Scatter':
-                                fig = px.scatter(filtered_df, x=timestamp_col, y=value_cols, title=f'Scatter Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
+                                fig = px.scatter(filtered_df, x=timestamp_col if timestamp_col != "None" else value_cols[0], y=value_cols, title=f'Scatter Plot - {plot_name}', color_discrete_sequence=color_discrete_sequence)
                             elif plot_type == 'Correlation':
                                 corr = filtered_df[value_cols].corr()
                                 fig = px.imshow(corr, text_auto=True, title=f'Correlation Plot - {plot_name}')
-
-                            # Display a message if the data is resampled
-                            if plot_freq is not None:
-                                st.markdown(f"*Data resampled using mean for {freq.lower()} frequency*")
 
                             st.plotly_chart(fig, use_container_width=True)
 
@@ -534,7 +529,7 @@ def main():
                 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
                 
                 st.sidebar.header("Add New Data")
-                new_date = st.sidebar.date_input("Date", value=max_datetime.date())
+                new_date = st.sidebar.date_input("Date", value=datetime.today().date())
                 new_time_str = st.sidebar.selectbox("Time", time_options)
                 new_value = st.sidebar.number_input("Value", value=0)
                 new_value_col = st.sidebar.selectbox("Select the value column to add data to", value_cols)
@@ -542,12 +537,13 @@ def main():
                 if st.sidebar.button("Add Data"):
                     try:
                         new_time = datetime.strptime(new_time_str, '%H:%M').time()
-                        new_datetime = datetime.combine(new_date, new_time)
-                        new_data = pd.DataFrame({timestamp_col: [new_datetime], new_value_col: [new_value]})
+                        new_datetime = datetime.combine(new_date, new_time) if timestamp_col != "None" else None
+                        new_data = pd.DataFrame({timestamp_col: [new_datetime] if timestamp_col != "None" else [new_value], new_value_col: [new_value]})
                         st.session_state.df = pd.concat([st.session_state.df, new_data], ignore_index=True)
-                        st.session_state.df[timestamp_col] = pd.to_datetime(st.session_state.df[timestamp_col], errors='coerce')
-                        st.session_state.df = st.session_state.df.dropna(subset=[timestamp_col])
-                        st.session_state.df = st.session_state.df.sort_values(by=timestamp_col).reset_index(drop=True)
+                        if timestamp_col != "None":
+                            st.session_state.df[timestamp_col] = pd.to_datetime(st.session_state.df[timestamp_col], errors='coerce')
+                            st.session_state.df = st.session_state.df.dropna(subset=[timestamp_col])
+                            st.session_state.df = st.session_state.df.sort_values(by=timestamp_col).reset_index(drop=True)
 
                         # Save updated data back to the file
                         if st.session_state.file_path.endswith('.csv'):
