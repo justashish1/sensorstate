@@ -60,6 +60,16 @@ def load_session_state():
         st.session_state.refresh_interval = session_state_data.get('refresh_interval')
         logging.info("Session state loaded from file")
 
+        # Check and update plot configurations if needed
+        updated_plots = []
+        for plot in st.session_state.plots:
+            if len(plot) == 7:  # If the old configuration with frequency is present
+                updated_plots.append(plot[:6])  # Remove the frequency
+            else:
+                updated_plots.append(plot)
+        st.session_state.plots = updated_plots
+        save_session_state()
+
 # Load session state at the start
 load_session_state()
 
@@ -263,7 +273,6 @@ if st.session_state.df is not None and st.session_state.file_path is not None:
             timestamp_col, value_cols, plot_name, plot_min_datetime, plot_max_datetime, plot_type = plot_config
 
             if selected_plot == "All" or selected_plot == plot_name:
-
                 filtered_df = filter_data(df, timestamp_col, start_datetime, end_datetime)
                 if not filtered_df.empty:
                     st.subheader(f"Plot: {plot_name}")
