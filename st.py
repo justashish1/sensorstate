@@ -86,17 +86,14 @@ def load_data(file_path):
         return None, None
 
 # Function to apply filters
-def filter_data(df, timestamp_col, start_datetime, end_datetime, freq):
-    logging.info("Filtering data from %s to %s with frequency %s", start_datetime, end_datetime, freq)
+def filter_data(df, timestamp_col, start_datetime, end_datetime):
+    logging.info("Filtering data from %s to %s", start_datetime, end_datetime)
     try:
         df[timestamp_col] = pd.to_datetime(df[timestamp_col], errors='coerce')
         df = df.dropna(subset=[timestamp_col])
 
         mask = (df[timestamp_col] >= start_datetime) & (df[timestamp_col] <= end_datetime)
         df = df.loc[mask]
-
-        if freq:
-            df = df.set_index(timestamp_col).resample(freq).mean().reset_index()
 
         logging.info("Data filtered successfully with %d records", len(df))
         return df
@@ -196,7 +193,7 @@ if st.session_state.df is not None and st.session_state.file_path is not None:
         # Add plot button and name input
         plot_name = st.sidebar.text_input("Plot Name")
         if st.sidebar.button('Add Plot'):
-            st.session_state.plots.append((timestamp_col, value_cols, plot_name, min_datetime, max_datetime, 'Line', 'None'))
+            st.session_state.plots.append((timestamp_col, value_cols, plot_name, min_datetime, max_datetime, 'Line'))
             save_session_state()
 
         # Select plot to apply filters
@@ -263,18 +260,11 @@ if st.session_state.df is not None and st.session_state.file_path is not None:
         # Display data with Plotly for each plot configuration
         plot_indices_to_remove = []
         for i, plot_config in enumerate(st.session_state.plots):
-            timestamp_col, value_cols, plot_name, plot_min_datetime, plot_max_datetime, plot_type, plot_freq = plot_config
+            timestamp_col, value_cols, plot_name, plot_min_datetime, plot_max_datetime, plot_type = plot_config
 
             if selected_plot == "All" or selected_plot == plot_name:
-                if plot_freq not in ['None', 'Minute', 'Hour', 'Daily', 'Weekly', 'Monthly', 'Yearly']:
-                    plot_freq = 'None'
 
-                freq = st.selectbox(f'Frequency for {plot_name}', ['None', 'Minute', 'Hour', 'Daily', 'Weekly', 'Monthly', 'Yearly'], index=['None', 'Minute', 'Hour', 'Daily', 'Weekly', 'Monthly', 'Yearly'].index(plot_freq), key=f'freq_{i}')
-                freq_dict = {'None': None, 'Minute': 'T', 'Hour': 'H', 'Daily': 'D', 'Weekly': 'W', 'Monthly': 'M', 'Yearly': 'Y'}
-                plot_freq = freq_dict[freq]
-                st.session_state.plots[i] = (timestamp_col, value_cols, plot_name, plot_min_datetime, plot_max_datetime, plot_type, freq)
-
-                filtered_df = filter_data(df, timestamp_col, start_datetime, end_datetime, plot_freq)
+                filtered_df = filter_data(df, timestamp_col, start_datetime, end_datetime)
                 if not filtered_df.empty:
                     st.subheader(f"Plot: {plot_name}")
                     plot_type = st.selectbox(f'Select plot type for {plot_name}', ['Line', 'Pie', 'Box', 'Bar', 'Stacked Bar', 'Count', 'Scatter', 'Correlation'], index=['Line', 'Pie', 'Box', 'Bar', 'Stacked Bar', 'Count', 'Scatter', 'Correlation'].index(plot_type), key=f'plot_type_{i}')
@@ -296,10 +286,6 @@ if st.session_state.df is not None and st.session_state.file_path is not None:
                     elif plot_type == 'Correlation':
                         corr = filtered_df[value_cols].corr()
                         fig = px.imshow(corr, text_auto=True, title=f'Correlation Plot - {plot_name}')
-
-                    # Display a message if the data is resampled
-                    if plot_freq is not None:
-                        st.markdown(f"*Data resampled using mean for {freq.lower()} frequency*")
 
                     st.plotly_chart(fig, use_container_width=True)
 
