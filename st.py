@@ -351,7 +351,30 @@ def main():
             # User specifies the filter column
             filter_col = st.sidebar.selectbox("Select the filter column", ["None"] + all_columns)
 
-            if filter_col and len(all_columns) > 0:
+            # User specifies the value columns
+            value_cols = st.sidebar.multiselect("Select the value column(s)", all_columns)
+
+            st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+
+            # Add plot button and name input
+            plot_name = st.sidebar.text_input("Plot Name")
+            plot_type = st.sidebar.selectbox('Select plot type', ['Line', 'Pie', 'Box', 'Bar', 'Stacked Bar', 'Count', 'Scatter', 'Correlation'])
+            if plot_name and st.sidebar.button('Add Plot'):
+                    st.session_state.plots.append({
+                        'filter_col': filter_col,
+                        'value_cols': value_cols,
+                        'plot_name': plot_name,
+                        'plot_type': plot_type,
+                        'start_val': start_val,
+                        'end_val': end_val
+                    })
+                    save_session_state()
+                    st.experimental_rerun()
+
+            st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+     
+
+            if filter_col and len(value_cols) > 0:
                 # Check if the filter column is a datetime column
                 if filter_col != "None" and pd.api.types.is_datetime64_any_dtype(df[filter_col]):
                     df[filter_col] = pd.to_datetime(df[filter_col], errors='coerce')
@@ -363,6 +386,12 @@ def main():
                     # Display detected format
                     st.sidebar.write(f"Detected start value: {min_val}")
                     st.sidebar.write(f"Detected end value: {max_val}")
+
+                    st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+
+                    # Select plot to apply filters
+                    plot_names = ["All"] + [plot['plot_name'] for plot in st.session_state.plots]
+                    selected_plot = st.sidebar.selectbox("Select Plot", plot_names)
 
                     st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 
@@ -415,31 +444,9 @@ def main():
                     start_val = None
                     end_val = None
 
-                # User specifies the value columns
-                value_cols = st.sidebar.multiselect("Select the value column(s)", all_columns)
-
-                # Add plot button and name input
-                plot_name = st.sidebar.text_input("Plot Name")
-                plot_type = st.sidebar.selectbox('Select plot type', ['Line', 'Pie', 'Box', 'Bar', 'Stacked Bar', 'Count', 'Scatter', 'Correlation'])
-                if plot_name and st.sidebar.button('Add Plot'):
-                    st.session_state.plots.append({
-                        'filter_col': filter_col,
-                        'value_cols': value_cols,
-                        'plot_name': plot_name,
-                        'plot_type': plot_type,
-                        'start_val': start_val,
-                        'end_val': end_val
-                    })
-                    save_session_state()
-                    st.experimental_rerun()
 
                 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 
-                # Select plot to apply filters
-                plot_names = ["All"] + [plot['plot_name'] for plot in st.session_state.plots]
-                selected_plot = st.sidebar.selectbox("Select Plot", plot_names)
-
-                st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 
                 # Auto-refresh interval input
                 st.sidebar.write("Auto-Refresh Settings")
@@ -516,7 +523,7 @@ def main():
                 new_date = st.sidebar.date_input("Date", value=max_val.date() if filter_col != "None" else datetime.now().date())
                 new_time_str = st.sidebar.selectbox("Time", time_options)
                 new_value = st.sidebar.number_input("Value", value=0)
-                new_value_col = st.sidebar.selectbox("Select the value column to add data to", all_columns)
+                new_value_col = st.sidebar.selectbox("Select the value column to add data to", value_cols)
 
                 if st.sidebar.button("Add Data"):
                     try:
